@@ -64,7 +64,7 @@ git clone https://github.com/graphdeco-inria/gaussian-splatting --recursive
 - 用于PyTorch扩展的CUDA SDK 11，*在* Visual Studio之后安装（我们使用了11.8，**11.6存在已知问题**）
 - C++编译器和CUDA SDK必须是兼容的
 
-
+> CUDA安装说明文档：[https://docs.nvidia.com/cuda/archive/11.8.0/cuda-installation-guide-linux/index.html](https://docs.nvidia.com/cuda/archive/11.8.0/cuda-installation-guide-linux/index.html)
 
 ### 设置
 
@@ -85,6 +85,19 @@ conda config --add pkgs_dirs <驱动器>/<包路径>
 conda env create --file environment.yml --prefix <驱动器>/<环境路径>/gaussian_splatting
 conda activate <驱动器>/<环境路径>/gaussian_splatting
 ```
+
+> 确保cuda版本在11.8及以上。
+> 也可以使用命令行安装：
+>> `conda create --name gaussian_splatting python=3.7.13`
+>> `conda activate gaussian_splatting`
+>> `conda config --env --add channels pytorch`
+`conda config --env --add channels conda-forge`
+`conda config --env --add channels defaults`
+>> `conda install cudatoolkit=11.6 plyfile=0.8.1 pip=22.3.1 pytorch=1.12.1 torchaudio=0.12.1 torchvision=0.13.1 tqdm`
+>> `pip install ./submodules/diff-gaussian-rasterization`
+`pip install ./submodules/simple-knn` 
+>
+> 如果下载时没有使用`--recursive`指令，也可以另外clone下来`diff-gaussian-rasterization`和`simple-knn`这两个库，随后安装进python环境即可。
 
 #### 修改
 
@@ -307,6 +320,12 @@ python full_eval.py -m <评估图像的目录>/garden ... --skip_training --skip
 
 ## 交互式查看器
 我们为我们的方法提供了两种交互式查看器：远程和实时。我们的查看解决方案基于[SIBR](https://sibr.gitlabpages.inria.fr/)框架，该框架由GRAPHDECO团队为多个新视图合成项目开发。
+
+也可以使用在线的方式：
+
+[https://colab.research.google.com/github/camenduru/gaussian-splatting-colab/blob/main/gaussian_splatting_viewer_colab.ipynb](https://colab.research.google.com/github/camenduru/gaussian-splatting-colab/blob/main/gaussian_splatting_viewer_colab.ipynb)
+
+运行colab中的脚本后，然后打开[https://intent-pcs-workforce-bios.trycloudflare.com/](https://intent-pcs-workforce-bios.trycloudflare.com/)这个网站。将训练生成的`point_cloud.ply`文件拖入浏览器即可。
 
 ### 硬件要求
 - 支持OpenGL 4.5的GPU和驱动程序（或最新的MESA软件）
