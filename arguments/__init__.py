@@ -78,6 +78,7 @@ class ModelParams(ParamGroup):
         super().__init__(parser, "Loading Parameters", sentinel)
 
     # 从命令行参数中提取模型参数，并进行处理。
+    # 只将source_path更换为绝对路径
     def extract(self, args):
         g = super().extract(args)
         # 将source_path转换为绝对路径。

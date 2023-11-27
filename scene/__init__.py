@@ -47,7 +47,8 @@ class Scene:
         # 将传入的 gaussians 实例赋值给实例的 gaussians 属性
         self.gaussians = gaussians
 
-        # 如果提供了 load_iteration 参数
+        # 如果提供了 load_iteration 参数（训练过程不使用，渲染过程中才使用）
+        # 用于表示渲染的点云是第几轮训练出的结果
         if load_iteration:
             # 如果 load_iteration 为 -1，表示寻找最大的迭代次数
             if load_iteration == -1:
