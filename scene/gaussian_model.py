@@ -9,72 +9,107 @@
 # For inquiries contact  george.drettakis@inria.fr
 #
 
+# 导入PyTorch库
 import torch
+
+# 导入NumPy库
 import numpy as np
+
+# 从utils.general_utils模块导入inverse_sigmoid, get_expon_lr_func, build_rotation函数
 from utils.general_utils import inverse_sigmoid, get_expon_lr_func, build_rotation
+
+# 从PyTorch库中导入nn模块
 from torch import nn
+
+# 导入Python的os模块，用于处理文件和目录
 import os
+
+# 从utils.system_utils模块导入mkdir_p函数
 from utils.system_utils import mkdir_p
+
+# 导入PlyData和PlyElement类，用于处理PLY格式的3D数据
 from plyfile import PlyData, PlyElement
+
+# 从utils.sh_utils模块导入RGB2SH函数
 from utils.sh_utils import RGB2SH
+
+# 从simple_knn._C模块导入distCUDA2函数
 from simple_knn._C import distCUDA2
+
+# 从utils.graphics_utils模块导入BasicPointCloud类
 from utils.graphics_utils import BasicPointCloud
+
+# 从utils.general_utils模块导入strip_symmetric, build_scaling_rotation函数
 from utils.general_utils import strip_symmetric, build_scaling_rotation
 
+# 定义一个名为GaussianModel的类
 class GaussianModel:
 
+    # 定义一个设置函数的方法
     def setup_functions(self):
+        # 定义一个内部函数，用于根据缩放和旋转构建协方差
         def build_covariance_from_scaling_rotation(scaling, scaling_modifier, rotation):
             L = build_scaling_rotation(scaling_modifier * scaling, rotation)
             actual_covariance = L @ L.transpose(1, 2)
             symm = strip_symmetric(actual_covariance)
             return symm
         
+        # 设置缩放的激活函数为指数函数
         self.scaling_activation = torch.exp
+        # 设置缩放的逆激活函数为对数函数
         self.scaling_inverse_activation = torch.log
 
+        # 设置协方差的激活函数为上面定义的build_covariance_from_scaling_rotation函数
         self.covariance_activation = build_covariance_from_scaling_rotation
 
+        # 设置不透明度的激活函数为sigmoid函数
         self.opacity_activation = torch.sigmoid
+        # 设置不透明度的逆激活函数为inverse_sigmoid函数
         self.inverse_opacity_activation = inverse_sigmoid
 
+        # 设置旋转的激活函数为归一化函数
         self.rotation_activation = torch.nn.functional.normalize
 
 
+    # 类的初始化方法，接受一个参数sh_degree（球谐函数的最高度数）
     def __init__(self, sh_degree : int):
-        self.active_sh_degree = 0
-        self.max_sh_degree = sh_degree  
-        self._xyz = torch.empty(0)
-        self._features_dc = torch.empty(0)
-        self._features_rest = torch.empty(0)
-        self._scaling = torch.empty(0)
-        self._rotation = torch.empty(0)
-        self._opacity = torch.empty(0)
-        self.max_radii2D = torch.empty(0)
-        self.xyz_gradient_accum = torch.empty(0)
-        self.denom = torch.empty(0)
-        self.optimizer = None
-        self.percent_dense = 0
-        self.spatial_lr_scale = 0
-        self.setup_functions()
+        self.active_sh_degree = 0  # 初始化当前激活的球谐函数度数为0
+        self.max_sh_degree = sh_degree  # 设置最大球谐函数度数为传入的sh_degree
+        # 初始化以下变量为零大小的空Tensor
+        self._xyz = torch.empty(0)  # 用于存储坐标
+        self._features_dc = torch.empty(0)  # 用于存储直流（DC）特征
+        self._features_rest = torch.empty(0)  # 用于存储其他特征
+        self._scaling = torch.empty(0)  # 用于存储缩放参数
+        self._rotation = torch.empty(0)  # 用于存储旋转参数
+        self._opacity = torch.empty(0)  # 用于存储不透明度
+        self.max_radii2D = torch.empty(0)  # 用于存储二维最大半径
+        self.xyz_gradient_accum = torch.empty(0)  # 用于累积梯度信息
+        self.denom = torch.empty(0)  # 用于存储分母信息
+        self.optimizer = None  # 初始化优化器为None
+        self.percent_dense = 0  # 初始化模型的密度百分比为0
+        self.spatial_lr_scale = 0  # 初始化空间学习率缩放为0
+        self.setup_functions()  # 调用setup_functions方法来设置类中的函数
 
+    # 定义一个capture方法，用于捕获当前模型状态并返回
     def capture(self):
         return (
-            self.active_sh_degree,
-            self._xyz,
-            self._features_dc,
-            self._features_rest,
-            self._scaling,
-            self._rotation,
-            self._opacity,
-            self.max_radii2D,
-            self.xyz_gradient_accum,
-            self.denom,
-            self.optimizer.state_dict(),
-            self.spatial_lr_scale,
+            self.active_sh_degree,  # 当前激活的球谐函数度数
+            self._xyz,  # 坐标
+            self._features_dc,  # 直流特征
+            self._features_rest,  # 其他特征
+            self._scaling,  # 缩放参数
+            self._rotation,  # 旋转参数
+            self._opacity,  # 不透明度
+            self.max_radii2D,  # 二维最大半径
+            self.xyz_gradient_accum,  # 梯度累积
+            self.denom,  # 分母
+            self.optimizer.state_dict(),  # 优化器的状态字典
+            self.spatial_lr_scale,  # 空间学习率缩放
         )
     
+    # 定义一个restore方法，用于恢复模型的状态
     def restore(self, model_args, training_args):
+        # 将传入的model_args解包到相应的属性中
         (self.active_sh_degree, 
         self._xyz, 
         self._features_dc, 
@@ -87,70 +122,93 @@ class GaussianModel:
         denom,
         opt_dict, 
         self.spatial_lr_scale) = model_args
-        self.training_setup(training_args)
-        self.xyz_gradient_accum = xyz_gradient_accum
-        self.denom = denom
-        self.optimizer.load_state_dict(opt_dict)
+        self.training_setup(training_args)  # 调用training_setup方法，传入training_args
+        self.xyz_gradient_accum = xyz_gradient_accum  # 设置xyz的梯度累积
+        self.denom = denom  # 设置分母
+        self.optimizer.load_state_dict(opt_dict)  # 从opt_dict中恢复优化器的状态
 
+    # 定义一个属性装饰器，当调用get_scaling时，返回通过激活函数处理的_scaling属性
     @property
     def get_scaling(self):
         return self.scaling_activation(self._scaling)
     
+    # 定义一个属性装饰器，当调用get_rotation时，返回通过激活函数处理的_rotation属性
     @property
     def get_rotation(self):
         return self.rotation_activation(self._rotation)
     
+    # 定义一个属性装饰器，当调用get_xyz时，直接返回_xyz属性
     @property
     def get_xyz(self):
         return self._xyz
     
+    # 定义一个属性装饰器，当调用get_features时，返回直流特征和其他特征的组合
     @property
     def get_features(self):
-        features_dc = self._features_dc
-        features_rest = self._features_rest
-        return torch.cat((features_dc, features_rest), dim=1)
+        features_dc = self._features_dc  # 获取直流特征
+        features_rest = self._features_rest  # 获取其他特征
+        return torch.cat((features_dc, features_rest), dim=1)  # 将两种特征合并并返回
     
+    # 定义一个属性装饰器，当调用get_opacity时，返回经过激活函数处理的不透明度
     @property
     def get_opacity(self):
-        return self.opacity_activation(self._opacity)
+        return self.opacity_activation(self._opacity)  # 使用不透明度激活函数处理_opacity属性并返回
     
+    # 定义一个方法get_covariance，用于获取协方差
     def get_covariance(self, scaling_modifier = 1):
+        # 使用协方差激活函数计算并返回协方差
         return self.covariance_activation(self.get_scaling, scaling_modifier, self._rotation)
 
+    # 定义一个方法oneupSHdegree，用于提升球谐函数的度数
     def oneupSHdegree(self):
+        # 如果当前激活的球谐函数度数小于最大度数，则将其增加1
         if self.active_sh_degree < self.max_sh_degree:
             self.active_sh_degree += 1
 
+    # 定义一个方法，用于从点云数据创建模型
     def create_from_pcd(self, pcd : BasicPointCloud, spatial_lr_scale : float):
-        self.spatial_lr_scale = spatial_lr_scale
+        self.spatial_lr_scale = spatial_lr_scale  # 设置空间学习率缩放
+        # 将点云数据转换为Tensor并移至CUDA设备
         fused_point_cloud = torch.tensor(np.asarray(pcd.points)).float().cuda()
+        # 将点云的颜色数据转换为球谐函数并移至CUDA设备
         fused_color = RGB2SH(torch.tensor(np.asarray(pcd.colors)).float().cuda())
+        # 初始化特征Tensor
         features = torch.zeros((fused_color.shape[0], 3, (self.max_sh_degree + 1) ** 2)).float().cuda()
-        features[:, :3, 0 ] = fused_color
-        features[:, 3:, 1:] = 0.0
+        features[:, :3, 0 ] = fused_color  # 设置直流部分的特征
+        features[:, 3:, 1:] = 0.0  # 其他特征部分初始化为0
 
+        # 打印初始化时点的数量
         print("Number of points at initialisation : ", fused_point_cloud.shape[0])
 
+        # 计算点间距离的平方，并保证值不小于一个很小的正数
         dist2 = torch.clamp_min(distCUDA2(torch.from_numpy(np.asarray(pcd.points)).float().cuda()), 0.0000001)
+        # 根据距离计算缩放比例
         scales = torch.log(torch.sqrt(dist2))[...,None].repeat(1, 3)
+        # 初始化旋转参数，旋转向量的第一个元素设置为1，其余为0
         rots = torch.zeros((fused_point_cloud.shape[0], 4), device="cuda")
         rots[:, 0] = 1
 
+        # 初始化不透明度参数
         opacities = inverse_sigmoid(0.1 * torch.ones((fused_point_cloud.shape[0], 1), dtype=torch.float, device="cuda"))
 
+        # 将各个参数转换为神经网络的参数，并设置为可优化
         self._xyz = nn.Parameter(fused_point_cloud.requires_grad_(True))
         self._features_dc = nn.Parameter(features[:,:,0:1].transpose(1, 2).contiguous().requires_grad_(True))
         self._features_rest = nn.Parameter(features[:,:,1:].transpose(1, 2).contiguous().requires_grad_(True))
         self._scaling = nn.Parameter(scales.requires_grad_(True))
         self._rotation = nn.Parameter(rots.requires_grad_(True))
         self._opacity = nn.Parameter(opacities.requires_grad_(True))
+        # 初始化用于存储二维最大半径的Tensor
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device="cuda")
 
+    # 定义一个方法用于设置训练参数
     def training_setup(self, training_args):
-        self.percent_dense = training_args.percent_dense
+        self.percent_dense = training_args.percent_dense  # 设置模型密度的百分比
+        # 初始化xyz梯度累积和分母为零的Tensor
         self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
         self.denom = torch.zeros((self.get_xyz.shape[0], 1), device="cuda")
 
+        # 创建一个列表，包含各个模型参数及其学习率和名称
         l = [
             {'params': [self._xyz], 'lr': training_args.position_lr_init * self.spatial_lr_scale, "name": "xyz"},
             {'params': [self._features_dc], 'lr': training_args.feature_lr, "name": "f_dc"},
@@ -160,33 +218,15 @@ class GaussianModel:
             {'params': [self._rotation], 'lr': training_args.rotation_lr, "name": "rotation"}
         ]
 
+        # 使用Adam优化器并设置其参数
         self.optimizer = torch.optim.Adam(l, lr=0.0, eps=1e-15)
+        # 设置xyz参数的学习率调度器
         self.xyz_scheduler_args = get_expon_lr_func(lr_init=training_args.position_lr_init*self.spatial_lr_scale,
                                                     lr_final=training_args.position_lr_final*self.spatial_lr_scale,
                                                     lr_delay_mult=training_args.position_lr_delay_mult,
                                                     max_steps=training_args.position_lr_max_steps)
 
-    def update_learning_rate(self, iteration):
-        ''' Learning rate scheduling per step '''
-        for param_group in self.optimizer.param_groups:
-            if param_group["name"] == "xyz":
-                lr = self.xyz_scheduler_args(iteration)
-                param_group['lr'] = lr
-                return lr
 
-    def construct_list_of_attributes(self):
-        l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
-        # All channels except the 3 DC
-        for i in range(self._features_dc.shape[1]*self._features_dc.shape[2]):
-            l.append('f_dc_{}'.format(i))
-        for i in range(self._features_rest.shape[1]*self._features_rest.shape[2]):
-            l.append('f_rest_{}'.format(i))
-        l.append('opacity')
-        for i in range(self._scaling.shape[1]):
-            l.append('scale_{}'.format(i))
-        for i in range(self._rotation.shape[1]):
-            l.append('rot_{}'.format(i))
-        return l
 
     def save_ply(self, path):
         mkdir_p(os.path.dirname(path))

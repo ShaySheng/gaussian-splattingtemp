@@ -29,12 +29,12 @@ Jonathan Stephens制作了一个出色的逐步教程，用于在您的机器上
 该存储库包含子模块，因此请使用以下命令进行检出：
 ```shell
 # SSH
-git clone git@github.com:graphdeco-inria/gaussian-splatting.git --recursive
+git clone git@github.com:ShaySheng/gaussian-splatting.git --recursive
 ```
 或
 ```shell
 # HTTPS
-git clone https://github.com/graphdeco-inria/gaussian-splatting --recursive
+git clone https://github.com/ShaySheng/gaussian-splatting --recursive
 ```
 
 
@@ -98,6 +98,10 @@ conda activate <驱动器>/<环境路径>/gaussian_splatting
 `pip install ./submodules/simple-knn` 
 >
 > 如果下载时没有使用`--recursive`指令，也可以另外clone下来`diff-gaussian-rasterization`和`simple-knn`这两个库，随后安装进python环境即可。
+> 可以在官网下载下面的
+> 虽然我们环境里用的cudatoolkit是11.6的但一定要安装cuda11.8和11.x的cudnn绝对不能安装cuda11.6否则就会报错
+> 一定要记住检查diff-guaussion-rasterization这个子库里还有一个子库GLM有没有同步
+> 如果是windows的话一定要看常见问题里的内容，把visual studio安装好之后，一定要把cl.exe这个文件所在的文件夹包含在环境变量中
 
 #### 修改
 
@@ -338,8 +342,13 @@ python full_eval.py -m <评估图像的目录>/garden ... --skip_training --skip
 - CMake（最近版本，我们使用了3.24）
 - 7zip（仅在Windows上）
 
+
+
 ### 预构建的Windows二进制文件
-我们在[这里](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/binaries/viewers.zip)为Windows提供了预构建的二进制文件。我们建议在Windows上使用它们进行高效的设置，因为SIBR的构建涉及到必须即时下载和编译的多个外部依赖项。
+
+注意直接用这个就行了，不要从源代码安装，因为非常麻烦。
+
+我们在[这个链接](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/binaries/viewers.zip)为Windows提供了预构建的二进制文件。我们建议在Windows上使用它们进行高效的设置，因为SIBR的构建涉及到必须即时下载和编译的多个外部依赖项。
 
 ### 从源代码安装
 如果您使用子模块克隆（例如，使用```--recursive```），则查看器的源代码位于```SIBR_viewers```中。网络查看器在用于基于图像的渲染应用程序的SIBR框架内运行。
