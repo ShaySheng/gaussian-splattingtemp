@@ -226,6 +226,34 @@ class GaussianModel:
                                                     lr_delay_mult=training_args.position_lr_delay_mult,
                                                     max_steps=training_args.position_lr_max_steps)
 
+    # 定义一个方法用于更新学习率
+    def update_learning_rate(self, iteration):
+        ''' Learning rate scheduling per step '''
+        # 遍历优化器中的参数组
+        for param_group in self.optimizer.param_groups:
+            # 如果参数组的名称是"xyz"，则进行学习率更新
+            if param_group["name"] == "xyz":
+                lr = self.xyz_scheduler_args(iteration)  # 根据迭代次数获取新的学习率
+                param_group['lr'] = lr  # 更新参数组的学习率
+                return lr  # 返回更新后的学习率
+
+    # 定义一个方法用于构建模型属性的列表
+    def construct_list_of_attributes(self):
+        l = ['x', 'y', 'z', 'nx', 'ny', 'nz']  # 初始化列表，包含位置和法线信息
+        # 添加所有直流特征的名称
+        for i in range(self._features_dc.shape[1]*self._features_dc.shape[2]):
+            l.append('f_dc_{}'.format(i))
+        # 添加所有其余特征的名称
+        for i in range(self._features_rest.shape[1]*self._features_rest.shape[2]):
+            l.append('f_rest_{}'.format(i))
+        l.append('opacity')  # 添加不透明度属性
+        # 添加所有缩放参数的名称
+        for i in range(self._scaling.shape[1]):
+            l.append('scale_{}'.format(i))
+        # 添加所有旋转参数的名称
+        for i in range(self._rotation.shape[1]):
+            l.append('rot_{}'.format(i))
+        return l  # 返回构建的属性列表
 
 
     def save_ply(self, path):
